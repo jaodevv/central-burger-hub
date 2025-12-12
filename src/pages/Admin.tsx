@@ -1,18 +1,153 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Package, Plus, Coffee, Tag, Percent, Settings } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, Package, Plus, Coffee, Tag, Percent, Settings, LogOut, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockProducts, mockAdditionals, mockCoupons, mockStoreSettings } from "@/data/mockData";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
+interface Product {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  category: string;
+  image_url: string | null;
+  available: boolean;
+}
+
+interface Additional {
+  id: string;
+  name: string;
+  price: number;
+  available: boolean;
+}
+
+interface Coupon {
+  id: string;
+  code: string;
+  discount: number;
+  discount_type: string;
+  active: boolean;
+}
+
+interface StoreSettings {
+  id: string;
+  name: string;
+  whatsapp: string;
+  delivery_fee: number;
+  is_open: boolean;
+  opening_hours: string;
+}
 
 export default function Admin() {
-  const [storeOpen, setStoreOpen] = useState(mockStoreSettings.isOpen);
+  const navigate = useNavigate();
+  const { user, isAdmin, loading: authLoading, signOut } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
+
+  // Fetch products
+  const { data: products = [], isLoading: productsLoading } = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .order("category", { ascending: true });
+      if (error) throw error;
+      return data as Product[];
+    },
+    enabled: !!user,
+  });
+
+  // Fetch additionals
+  const { data: additionals = [] } = useQuery({
+    queryKey: ["additionals"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("additionals").select("*");
+      if (error) throw error;
+      return data as Additional[];
+    },
+    enabled: !!user,
+  });
+
+  // Fetch coupons (admin only)
+  const { data: coupons = [] } = useQuery({
+    queryKey: ["coupons"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("coupons").select("*");
+      if (error) throw error;
+      return data as Coupon[];
+    },
+    enabled: !!user && isAdmin,
+  });
+
+  // Fetch store settings
+  const { data: storeSettings } = useQuery({
+    queryKey: ["storeSettings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("store_settings")
+        .select("*")
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data as StoreSettings | null;
+    },
+    enabled: !!user,
+  });
+
+  // Update product availability
+  const updateProductMutation = useMutation({
+    mutationFn: async ({ id, available }: { id: string; available: boolean }) => {
+      const { error } = await supabase
+        .from("products")
+        .update({ available })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast.success("Produto atualizado!");
+    },
+    onError: (error) => {
+      toast.error("Erro ao atualizar produto. Você precisa ser admin.");
+      console.error(error);
+    },
+  });
+
+  // Update store settings
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (settings: Partial<StoreSettings>) => {
+      if (!storeSettings?.id) return;
+      const { error } = await supabase
+        .from("store_settings")
+        .update(settings)
+        .eq("id", storeSettings.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["storeSettings"] });
+      toast.success("Configurações atualizadas!");
+    },
+    onError: (error) => {
+      toast.error("Erro ao atualizar. Você precisa ser admin.");
+      console.error(error);
+    },
+  });
 
   const formatPrice = (price: number) => {
     return price.toLocaleString("pt-BR", {
@@ -22,9 +157,25 @@ export default function Admin() {
   };
 
   const handleToggleStore = (open: boolean) => {
-    setStoreOpen(open);
-    toast.success(open ? "Loja aberta!" : "Loja fechada!");
+    updateSettingsMutation.mutate({ is_open: open });
   };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -43,23 +194,36 @@ export default function Admin() {
                   PAINEL ADMIN
                 </h1>
                 <p className="text-xs text-muted-foreground">
-                  Gerencie seu cardápio e configurações
+                  {isAdmin ? "Acesso completo" : "Visualização apenas"} • {user.email}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Label htmlFor="store-toggle" className="text-sm text-muted-foreground">
-                Loja {storeOpen ? "Aberta" : "Fechada"}
+              <Label htmlFor="store-toggle" className="text-sm text-muted-foreground hidden sm:block">
+                Loja {storeSettings?.is_open ? "Aberta" : "Fechada"}
               </Label>
               <Switch
                 id="store-toggle"
-                checked={storeOpen}
+                checked={storeSettings?.is_open ?? false}
                 onCheckedChange={handleToggleStore}
+                disabled={!isAdmin}
               />
+              <Button variant="outline" size="icon" onClick={handleSignOut}>
+                <LogOut className="w-4 h-4" />
+              </Button>
             </div>
           </div>
         </div>
       </header>
+
+      {/* Admin Notice */}
+      {!isAdmin && (
+        <div className="bg-primary/10 border-b border-primary/20 py-3 px-4 text-center">
+          <p className="text-sm text-primary">
+            Você está em modo de visualização. Para editar, peça acesso de administrador.
+          </p>
+        </div>
+      )}
 
       {/* Content */}
       <main className="max-w-6xl mx-auto px-4 py-6">
@@ -96,45 +260,57 @@ export default function Admin() {
             >
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-xl tracking-wide">Produtos</h2>
-                <Button className="gap-2">
+                <Button className="gap-2" disabled={!isAdmin}>
                   <Plus className="w-4 h-4" />
                   Novo Produto
                 </Button>
               </div>
 
-              <div className="grid gap-4">
-                {mockProducts.map((product) => (
-                  <Card key={product.id} className="overflow-hidden">
-                    <div className="flex items-center gap-4 p-4">
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="w-20 h-20 rounded-lg object-cover"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-foreground">{product.name}</h3>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {product.description}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-primary font-bold">
-                            {formatPrice(product.price)}
-                          </span>
-                          <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded">
-                            {product.category}
-                          </span>
+              {productsLoading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {products.map((product) => (
+                    <Card key={product.id} className="overflow-hidden">
+                      <div className="flex items-center gap-4 p-4">
+                        <img
+                          src={product.image_url || "/placeholder.svg"}
+                          alt={product.name}
+                          className="w-20 h-20 rounded-lg object-cover"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-foreground">{product.name}</h3>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {product.description}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-primary font-bold">
+                              {formatPrice(product.price)}
+                            </span>
+                            <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded">
+                              {product.category}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={product.available}
+                            onCheckedChange={(checked) =>
+                              updateProductMutation.mutate({ id: product.id, available: checked })
+                            }
+                            disabled={!isAdmin}
+                          />
+                          <Button variant="outline" size="sm" disabled={!isAdmin}>
+                            Editar
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Switch defaultChecked={product.available} />
-                        <Button variant="outline" size="sm">
-                          Editar
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </motion.div>
           </TabsContent>
 
@@ -147,14 +323,14 @@ export default function Admin() {
             >
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-xl tracking-wide">Adicionais</h2>
-                <Button className="gap-2">
+                <Button className="gap-2" disabled={!isAdmin}>
                   <Plus className="w-4 h-4" />
                   Novo Adicional
                 </Button>
               </div>
 
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {mockAdditionals.map((additional) => (
+                {additionals.map((additional) => (
                   <Card key={additional.id}>
                     <CardContent className="p-4 flex items-center justify-between">
                       <div>
@@ -163,7 +339,7 @@ export default function Admin() {
                           +{formatPrice(additional.price)}
                         </span>
                       </div>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" disabled={!isAdmin}>
                         Editar
                       </Button>
                     </CardContent>
@@ -182,24 +358,24 @@ export default function Admin() {
             >
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-xl tracking-wide">Cupons</h2>
-                <Button className="gap-2">
+                <Button className="gap-2" disabled={!isAdmin}>
                   <Plus className="w-4 h-4" />
                   Novo Cupom
                 </Button>
               </div>
 
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {mockCoupons.map((coupon) => (
+                {coupons.map((coupon) => (
                   <Card key={coupon.id}>
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-mono font-bold text-primary text-lg">
                           {coupon.code}
                         </span>
-                        <Switch defaultChecked={coupon.active} />
+                        <Switch checked={coupon.active} disabled={!isAdmin} />
                       </div>
                       <p className="text-muted-foreground text-sm">
-                        {coupon.type === "percentage"
+                        {coupon.discount_type === "percentage"
                           ? `${coupon.discount}% de desconto`
                           : `${formatPrice(coupon.discount)} de desconto`}
                       </p>
@@ -219,7 +395,7 @@ export default function Admin() {
             >
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-xl tracking-wide">Promoções</h2>
-                <Button className="gap-2">
+                <Button className="gap-2" disabled={!isAdmin}>
                   <Plus className="w-4 h-4" />
                   Nova Promoção
                 </Button>
@@ -258,15 +434,17 @@ export default function Admin() {
                     <Label htmlFor="store-name">Nome da Loja</Label>
                     <Input
                       id="store-name"
-                      defaultValue={mockStoreSettings.name}
+                      defaultValue={storeSettings?.name}
+                      disabled={!isAdmin}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="whatsapp">WhatsApp</Label>
                     <Input
                       id="whatsapp"
-                      defaultValue={mockStoreSettings.whatsapp}
+                      defaultValue={storeSettings?.whatsapp}
                       placeholder="5511999999999"
+                      disabled={!isAdmin}
                     />
                   </div>
                   <div className="space-y-2">
@@ -274,17 +452,21 @@ export default function Admin() {
                     <Input
                       id="delivery-fee"
                       type="number"
-                      defaultValue={mockStoreSettings.deliveryFee}
+                      defaultValue={storeSettings?.delivery_fee}
+                      disabled={!isAdmin}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="hours">Horário de Funcionamento</Label>
                     <Input
                       id="hours"
-                      defaultValue={mockStoreSettings.openingHours}
+                      defaultValue={storeSettings?.opening_hours}
+                      disabled={!isAdmin}
                     />
                   </div>
-                  <Button className="w-full">Salvar Alterações</Button>
+                  <Button className="w-full" disabled={!isAdmin}>
+                    Salvar Alterações
+                  </Button>
                 </CardContent>
               </Card>
             </motion.div>

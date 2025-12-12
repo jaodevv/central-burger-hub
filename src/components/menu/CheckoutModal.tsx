@@ -5,21 +5,45 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCart } from "@/context/CartContext";
-import { mockStoreSettings, mockCoupons } from "@/data/mockData";
 import { toast } from "sonner";
 import { MessageCircle, Tag, Check } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { StoreSettings } from "@/types";
 
 interface CheckoutModalProps {
   open: boolean;
   onClose: () => void;
+  storeSettings?: StoreSettings;
 }
 
-export default function CheckoutModal({ open, onClose }: CheckoutModalProps) {
+interface Coupon {
+  id: string;
+  code: string;
+  discount: number;
+  discount_type: string;
+  active: boolean;
+}
+
+export default function CheckoutModal({ open, onClose, storeSettings }: CheckoutModalProps) {
   const { items, total, clearCart } = useCart();
   const [customerName, setCustomerName] = useState("");
   const [address, setAddress] = useState("");
   const [couponCode, setCouponCode] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState<typeof mockCoupons[0] | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+
+  // Fetch coupons from database
+  const { data: coupons = [] } = useQuery({
+    queryKey: ["coupons-public"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("coupons")
+        .select("*")
+        .eq("active", true);
+      if (error) throw error;
+      return data as Coupon[];
+    },
+  });
 
   const formatPrice = (price: number) => {
     return price.toLocaleString("pt-BR", {
@@ -28,10 +52,12 @@ export default function CheckoutModal({ open, onClose }: CheckoutModalProps) {
     });
   };
 
-  const deliveryFee = mockStoreSettings.deliveryFee;
+  const deliveryFee = storeSettings?.deliveryFee ?? 8;
+  const storeName = storeSettings?.name ?? "Central Burger";
+  const storeWhatsapp = storeSettings?.whatsapp ?? "5511999999999";
 
   const discount = appliedCoupon
-    ? appliedCoupon.type === "percentage"
+    ? appliedCoupon.discount_type === "percentage"
       ? (total * appliedCoupon.discount) / 100
       : appliedCoupon.discount
     : 0;
@@ -39,7 +65,7 @@ export default function CheckoutModal({ open, onClose }: CheckoutModalProps) {
   const finalTotal = total + deliveryFee - discount;
 
   const handleApplyCoupon = () => {
-    const coupon = mockCoupons.find(
+    const coupon = coupons.find(
       (c) => c.code.toLowerCase() === couponCode.toLowerCase() && c.active
     );
 
@@ -57,7 +83,7 @@ export default function CheckoutModal({ open, onClose }: CheckoutModalProps) {
   };
 
   const generateWhatsAppMessage = () => {
-    let message = `🍔 *NOVO PEDIDO - ${mockStoreSettings.name}*\n\n`;
+    let message = `🍔 *NOVO PEDIDO - ${storeName}*\n\n`;
     message += `👤 *Cliente:* ${customerName}\n`;
     message += `📍 *Endereço:* ${address}\n\n`;
     message += `📋 *Itens do Pedido:*\n`;
@@ -86,7 +112,7 @@ export default function CheckoutModal({ open, onClose }: CheckoutModalProps) {
     return encodeURIComponent(message);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!customerName.trim()) {
       toast.error("Por favor, informe seu nome");
       return;
@@ -96,8 +122,36 @@ export default function CheckoutModal({ open, onClose }: CheckoutModalProps) {
       return;
     }
 
+    // Save order to database
+    const orderItems = items.map((item) => ({
+      product_id: item.product.id,
+      product_name: item.product.name,
+      quantity: item.quantity,
+      price: item.product.price,
+      additionals: item.additionals,
+      notes: item.notes,
+      meat_point: item.meatPoint,
+    }));
+
+    const { error } = await supabase.from("orders").insert({
+      customer_name: customerName,
+      customer_address: address,
+      items: orderItems as unknown as import("@/integrations/supabase/types").Json,
+      subtotal: total,
+      delivery_fee: deliveryFee,
+      discount: discount,
+      coupon_code: appliedCoupon?.code || null,
+      total: finalTotal,
+    });
+
+    if (error) {
+      console.error("Error saving order:", error);
+      toast.error("Erro ao salvar pedido");
+      return;
+    }
+
     const message = generateWhatsAppMessage();
-    const whatsappUrl = `https://wa.me/${mockStoreSettings.whatsapp}?text=${message}`;
+    const whatsappUrl = `https://wa.me/${storeWhatsapp}?text=${message}`;
 
     window.open(whatsappUrl, "_blank");
     clearCart();

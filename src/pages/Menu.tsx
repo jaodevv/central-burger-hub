@@ -1,9 +1,8 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Share2 } from "lucide-react";
+import { ArrowLeft, Share2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { mockProducts, mockAdditionals, mockStoreSettings } from "@/data/mockData";
-import { Product } from "@/types";
+import { Product, Additional as AdditionalType } from "@/types";
 import CategoryTabs from "@/components/menu/CategoryTabs";
 import ProductCard from "@/components/menu/ProductCard";
 import CartFooter from "@/components/menu/CartFooter";
@@ -12,6 +11,8 @@ import CustomizationModal from "@/components/menu/CustomizationModal";
 import CheckoutModal from "@/components/menu/CheckoutModal";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Menu() {
   const [activeCategory, setActiveCategory] = useState("Todos");
@@ -19,20 +20,73 @@ export default function Menu() {
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
+  // Fetch products from database
+  const { data: products = [], isLoading: productsLoading } = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("available", true)
+        .order("category");
+      if (error) throw error;
+      return data.map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description || "",
+        price: Number(p.price),
+        category: p.category,
+        image: p.image_url || "/placeholder.svg",
+        available: p.available,
+      })) as Product[];
+    },
+  });
+
+  // Fetch additionals from database
+  const { data: additionals = [] } = useQuery({
+    queryKey: ["additionals"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("additionals")
+        .select("*")
+        .eq("available", true);
+      if (error) throw error;
+      return data.map((a) => ({
+        id: a.id,
+        name: a.name,
+        price: Number(a.price),
+      })) as AdditionalType[];
+    },
+  });
+
+  // Fetch store settings
+  const { data: storeSettings } = useQuery({
+    queryKey: ["storeSettings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("store_settings")
+        .select("*")
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const categories = useMemo(() => {
-    const cats = [...new Set(mockProducts.map((p) => p.category))];
+    const cats = [...new Set(products.map((p) => p.category))];
     return ["Todos", ...cats];
-  }, []);
+  }, [products]);
 
   const filteredProducts = useMemo(() => {
-    if (activeCategory === "Todos") return mockProducts;
-    return mockProducts.filter((p) => p.category === activeCategory);
-  }, [activeCategory]);
+    if (activeCategory === "Todos") return products;
+    return products.filter((p) => p.category === activeCategory);
+  }, [activeCategory, products]);
 
   const handleShare = async () => {
     const shareData = {
-      title: mockStoreSettings.name,
-      text: `Confira o cardápio do ${mockStoreSettings.name}!`,
+      title: storeSettings?.name || "Central Burger",
+      text: `Confira o cardápio do ${storeSettings?.name || "Central Burger"}!`,
       url: window.location.href,
     };
 
@@ -53,6 +107,14 @@ export default function Menu() {
     setCheckoutOpen(true);
   };
 
+  if (productsLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
@@ -66,15 +128,15 @@ export default function Menu() {
             </Link>
             <div className="text-center">
               <h1 className="font-display text-2xl tracking-wide">
-                <span className="gradient-text">{mockStoreSettings.name}</span>
+                <span className="gradient-text">{storeSettings?.name || "Central Burger"}</span>
               </h1>
               <p className="text-xs text-muted-foreground">
-                {mockStoreSettings.isOpen ? (
+                {storeSettings?.is_open ? (
                   <span className="text-primary">● Aberto</span>
                 ) : (
                   <span className="text-destructive">● Fechado</span>
                 )}{" "}
-                • {mockStoreSettings.openingHours}
+                • {storeSettings?.opening_hours || "18:00 - 23:00"}
               </p>
             </div>
             <Button variant="ghost" size="icon" onClick={handleShare}>
@@ -123,7 +185,7 @@ export default function Menu() {
       {/* Modals & Drawers */}
       <CustomizationModal
         product={selectedProduct}
-        additionals={mockAdditionals}
+        additionals={additionals}
         open={!!selectedProduct}
         onClose={() => setSelectedProduct(null)}
       />
@@ -134,7 +196,17 @@ export default function Menu() {
         onCheckout={handleCheckout}
       />
 
-      <CheckoutModal open={checkoutOpen} onClose={() => setCheckoutOpen(false)} />
+      <CheckoutModal 
+        open={checkoutOpen} 
+        onClose={() => setCheckoutOpen(false)}
+        storeSettings={storeSettings ? {
+          name: storeSettings.name,
+          whatsapp: storeSettings.whatsapp,
+          deliveryFee: Number(storeSettings.delivery_fee),
+          isOpen: storeSettings.is_open,
+          openingHours: storeSettings.opening_hours,
+        } : undefined}
+      />
 
       {/* Cart Footer */}
       <CartFooter onOpen={() => setCartOpen(true)} />
