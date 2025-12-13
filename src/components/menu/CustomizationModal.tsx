@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useCart } from "@/context/CartContext";
 import { toast } from "sonner";
+import { Minus, Plus } from "lucide-react";
 
 interface CustomizationModalProps {
   product: Product | null;
@@ -28,6 +29,7 @@ export default function CustomizationModal({
   const [selectedAdditionals, setSelectedAdditionals] = useState<Additional[]>([]);
   const [notes, setNotes] = useState("");
   const [meatPoint, setMeatPoint] = useState("Ao ponto");
+  const [quantity, setQuantity] = useState(1);
 
   const formatPrice = (price: number) => {
     return price.toLocaleString("pt-BR", {
@@ -44,17 +46,21 @@ export default function CustomizationModal({
     );
   };
 
-  const totalPrice =
+  const unitPrice =
     (product?.price || 0) +
     selectedAdditionals.reduce((sum, a) => sum + a.price, 0);
+
+  const totalPrice = unitPrice * quantity;
 
   const handleAddToCart = () => {
     if (!product) return;
 
     const isBurger = product.category === "Burgers";
-    addItem(product, selectedAdditionals, notes, isBurger ? meatPoint : undefined);
+    for (let i = 0; i < quantity; i++) {
+      addItem(product, selectedAdditionals, notes, isBurger ? meatPoint : undefined);
+    }
     
-    toast.success(`${product.name} adicionado ao carrinho!`);
+    toast.success(`${quantity}x ${product.name} adicionado ao carrinho!`);
     handleClose();
   };
 
@@ -62,6 +68,7 @@ export default function CustomizationModal({
     setSelectedAdditionals([]);
     setNotes("");
     setMeatPoint("Ao ponto");
+    setQuantity(1);
     onClose();
   };
 
@@ -152,9 +159,36 @@ export default function CustomizationModal({
             </div>
           )}
 
+          {/* Quantity Selector - For drinks */}
+          {isDrink && (
+            <div className="space-y-3">
+              <h4 className="font-medium text-foreground">Quantidade</h4>
+              <div className="flex items-center justify-center gap-4">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  disabled={quantity <= 1}
+                >
+                  <Minus className="w-4 h-4" />
+                </Button>
+                <span className="text-xl font-bold min-w-[3rem] text-center">
+                  {quantity}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setQuantity((q) => q + 1)}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Add to Cart Button */}
           <Button onClick={handleAddToCart} className="w-full" size="lg">
-            Adicionar • {formatPrice(totalPrice)}
+            Adicionar {quantity > 1 ? `${quantity}x` : ""} • {formatPrice(totalPrice)}
           </Button>
         </div>
       </DialogContent>
