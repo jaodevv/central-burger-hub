@@ -12,6 +12,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { SettingsForm } from "@/components/admin/SettingsForm";
 
 interface Product {
   id: string;
@@ -415,61 +416,12 @@ export default function Admin() {
 
           {/* Settings Tab */}
           <TabsContent value="settings">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-4"
-            >
-              <h2 className="font-display text-xl tracking-wide">Configurações</h2>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Informações da Loja</CardTitle>
-                  <CardDescription>
-                    Configure as informações gerais do seu estabelecimento
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="store-name">Nome da Loja</Label>
-                    <Input
-                      id="store-name"
-                      defaultValue={storeSettings?.name}
-                      disabled={!isAdmin}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="whatsapp">WhatsApp</Label>
-                    <Input
-                      id="whatsapp"
-                      defaultValue={storeSettings?.whatsapp}
-                      placeholder="5511999999999"
-                      disabled={!isAdmin}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="delivery-fee">Taxa de Entrega</Label>
-                    <Input
-                      id="delivery-fee"
-                      type="number"
-                      defaultValue={storeSettings?.delivery_fee}
-                      disabled={!isAdmin}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="hours">Horário de Funcionamento</Label>
-                    <Input
-                      id="hours"
-                      defaultValue={storeSettings?.opening_hours}
-                      disabled={!isAdmin}
-                    />
-                  </div>
-                  <Button className="w-full" disabled={!isAdmin}>
-                    Salvar Alterações
-                  </Button>
-                </CardContent>
-              </Card>
-            </motion.div>
+            <SettingsForm 
+              storeSettings={storeSettings} 
+              isAdmin={isAdmin} 
+              onSave={(settings) => updateSettingsMutation.mutate(settings)}
+              isPending={updateSettingsMutation.isPending}
+            />
           </TabsContent>
         </Tabs>
       </main>
