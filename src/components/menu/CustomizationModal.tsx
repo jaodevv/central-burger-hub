@@ -68,6 +68,7 @@ export default function CustomizationModal({
   if (!product) return null;
 
   const isBurger = product.category === "Burgers";
+  const isDrink = product.category === "Bebidas";
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -107,8 +108,8 @@ export default function CustomizationModal({
             </div>
           )}
 
-          {/* Additionals */}
-          {additionals.length > 0 && (
+          {/* Additionals - Not for drinks */}
+          {!isDrink && additionals.length > 0 && (
             <div className="space-y-3">
               <h4 className="font-medium text-foreground">Adicionais</h4>
               <div className="space-y-2">
@@ -136,18 +137,20 @@ export default function CustomizationModal({
             </div>
           )}
 
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Observações</Label>
-            <Textarea
-              id="notes"
-              placeholder="Ex: Sem cebola, sem picles..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="resize-none"
-              rows={3}
-            />
-          </div>
+          {/* Notes - Not for drinks */}
+          {!isDrink && (
+            <div className="space-y-2">
+              <Label htmlFor="notes">Observações</Label>
+              <Textarea
+                id="notes"
+                placeholder="Ex: Sem cebola, sem picles..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="resize-none"
+                rows={3}
+              />
+            </div>
+          )}
 
           {/* Add to Cart Button */}
           <Button onClick={handleAddToCart} className="w-full" size="lg">
