@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Product, Additional } from "@/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,26 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useCart } from "@/context/CartContext";
 import { toast } from "sonner";
 import { Minus, Plus } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CustomizationModalProps {
   product: Product | null;
   additionals: Additional[];
   open: boolean;
   onClose: () => void;
+}
+
+// Interface para os itens do combo (salvos na descrição)
+interface ComboItem {
+  product_id: string;
+  quantity: number;
+}
+
+// Interface para o produto com apenas o ID e o nome
+interface SimpleProduct {
+  id: string;
+  name: string;
 }
 
 const meatPoints = ["Mal passado", "Ao ponto", "Bem passado"];
@@ -30,6 +44,61 @@ export default function CustomizationModal({
   const [notes, setNotes] = useState("");
   const [meatPoint, setMeatPoint] = useState("Ao ponto");
   const [quantity, setQuantity] = useState(1);
+
+  const isCombo = product?.category === "Combos";
+
+  // --- Lógica de Busca de Produtos do Combo ---
+  const getComboItemIds = (description: string): string[] => {
+    const comboItemsMarker = "--- COMBO ITEMS ---";
+    const parts = description.split(comboItemsMarker);
+    if (parts.length < 2) return [];
+
+    const comboItemsJson = parts[1].trim();
+    try {
+      const comboItems: ComboItem[] = JSON.parse(comboItemsJson);
+      return comboItems.map(item => item.product_id);
+    } catch (e) {
+      return [];
+    }
+  };
+
+  const comboItemIds = product && isCombo ? getComboItemIds(product.description) : [];
+  const { data: comboProducts = [] } = useQuery({
+    queryKey: ["comboProducts", comboItemIds],
+    queryFn: async () => {
+      if (comboItemIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name")
+        .in("id", comboItemIds);
+      if (error) throw error;
+      return data as SimpleProduct[];
+    },
+    enabled: isCombo && comboItemIds.length > 0,
+  });
+
+  const formatComboDescription = (description: string) => {
+    const comboItemsMarker = "--- COMBO ITEMS ---";
+    const parts = description.split(comboItemsMarker);
+    if (parts.length < 2) return description;
+
+    const comboItemsJson = parts[1].trim();
+    try {
+      const comboItems: ComboItem[] = JSON.parse(comboItemsJson);
+      if (!Array.isArray(comboItems)) return description;
+
+      const formattedItems = comboItems.map((item) => {
+        const product = comboProducts.find(p => p.id === item.product_id);
+        return `${item.quantity}x ${product ? product.name : 'Produto Desconhecido'}`;
+      }).join(", ");
+
+      return `Contém: ${formattedItems}`;
+
+    } catch (e) {
+      return description;
+    }
+  };
+  // --- Fim Lógica de Busca de Produtos do Combo ---
 
   const formatPrice = (price: number) => {
     return price.toLocaleString("pt-BR", {
@@ -96,7 +165,10 @@ export default function CustomizationModal({
             />
           </div>
 
-          <p className="text-muted-foreground text-sm">{product.description}</p>
+          {/* Descrição do Produto/Combo */}
+          <p className="text-muted-foreground text-sm">
+            {isCombo ? formatComboDescription(product.description) : product.description}
+          </p>
 
           {/* Meat Point - Only for burgers */}
           {isBurger && (
@@ -115,8 +187,8 @@ export default function CustomizationModal({
             </div>
           )}
 
-          {/* Additionals - Not for drinks */}
-          {!isDrink && additionals.length > 0 && (
+          {/* Additionals - Not for drinks or combos */}
+          {!isDrink && !isCombo && additionals.length > 0 && (
             <div className="space-y-3">
               <h4 className="font-medium text-foreground">Adicionais</h4>
               <div className="space-y-2">

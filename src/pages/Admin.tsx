@@ -1,6 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Package, Plus, Coffee, Tag, Percent, Settings, LogOut, Loader2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, Package, Plus, Coffee, Tag, Percent, Settings, LogOut, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +25,13 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { SettingsForm } from "@/components/admin/SettingsForm";
+import { ProductCreateForm } from "@/components/admin/ProductCreateForm";
+import { AdditionalCreateForm } from "@/components/admin/AdditionalCreateForm";
+import { CouponCreateForm } from "@/components/admin/CouponCreateForm";
+
+import { AdditionalEditForm } from "@/components/admin/AdditionalEditForm";
+import { ProductEditForm } from "@/components/admin/ProductEditForm";
+import { ComboCreateForm } from "@/components/admin/ComboCreateForm";
 
 interface Product {
   id: string;
@@ -39,6 +58,18 @@ interface Coupon {
   active: boolean;
 }
 
+interface Promotion {
+  id: string;
+  name: string;
+  description: string | null;
+  discount: number;
+  discount_type: 'percentage' | 'fixed';
+  applicable_categories: string[] | null;
+  active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+}
+
 interface StoreSettings {
   id: string;
   name: string;
@@ -59,6 +90,15 @@ export default function Admin() {
       navigate("/auth");
     }
   }, [user, authLoading, navigate]);
+
+  // Fetch products
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingAdditional, setEditingAdditional] = useState<Additional | null>(null);
+  const [isProductCreateOpen, setIsProductCreateOpen] = useState(false);
+  const [isComboCreateOpen, setIsComboCreateOpen] = useState(false);
+  const [isAdditionalCreateOpen, setIsAdditionalCreateOpen] = useState(false);
+  const [isCouponCreateOpen, setIsCouponCreateOpen] = useState(false);
+
 
   // Fetch products
   const { data: products = [], isLoading: productsLoading } = useQuery({
@@ -96,6 +136,8 @@ export default function Admin() {
     enabled: !!user && isAdmin,
   });
 
+
+
   // Fetch store settings
   const { data: storeSettings } = useQuery({
     queryKey: ["storeSettings"],
@@ -111,7 +153,39 @@ export default function Admin() {
     enabled: !!user,
   });
 
-  // Update product availability
+	  // Delete product mutation
+	  const deleteProductMutation = useMutation({
+	    mutationFn: async (id: string) => {
+	      const { error } = await supabase.from("products").delete().eq("id", id);
+	      if (error) throw error;
+	    },
+	    onSuccess: () => {
+	      queryClient.invalidateQueries({ queryKey: ["products"] });
+	      toast.success("Produto excluído com sucesso!");
+	    },
+	    onError: (error) => {
+	      toast.error("Erro ao excluir produto. Você precisa ser admin.");
+	      console.error(error);
+	    },
+	  });
+	
+	  // Delete additional mutation
+	  const deleteAdditionalMutation = useMutation({
+	    mutationFn: async (id: string) => {
+	      const { error } = await supabase.from("additionals").delete().eq("id", id);
+	      if (error) throw error;
+	    },
+	    onSuccess: () => {
+	      queryClient.invalidateQueries({ queryKey: ["additionals"] });
+	      toast.success("Adicional excluído com sucesso!");
+	    },
+	    onError: (error) => {
+	      toast.error("Erro ao excluir adicional. Você precisa ser admin.");
+	      console.error(error);
+	    },
+	  });
+	
+	  // Update product availability
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, available }: { id: string; available: boolean }) => {
       const { error } = await supabase
@@ -129,6 +203,27 @@ export default function Admin() {
       console.error(error);
     },
   });
+
+  // Update coupon availability
+  const updateCouponMutation = useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      const { error } = await supabase
+        .from("coupons")
+        .update({ active })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["coupons"] });
+      toast.success("Cupom atualizado!");
+    },
+    onError: (error) => {
+      toast.error("Erro ao atualizar cupom. Você precisa ser admin.");
+      console.error(error);
+    },
+  });
+
+
 
   // Update store settings
   const updateSettingsMutation = useMutation({
@@ -242,9 +337,9 @@ export default function Admin() {
               <Tag className="w-4 h-4" />
               <span className="hidden sm:inline">Cupons</span>
             </TabsTrigger>
-            <TabsTrigger value="promotions" className="gap-2">
-              <Percent className="w-4 h-4" />
-              <span className="hidden sm:inline">Promoções</span>
+            <TabsTrigger value="combos" className="gap-2">
+              <Package className="w-4 h-4" />
+              <span className="hidden sm:inline">Combos</span>
             </TabsTrigger>
             <TabsTrigger value="settings" className="gap-2">
               <Settings className="w-4 h-4" />
@@ -261,10 +356,16 @@ export default function Admin() {
             >
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-xl tracking-wide">Produtos</h2>
-                <Button className="gap-2" disabled={!isAdmin}>
-                  <Plus className="w-4 h-4" />
-                  Novo Produto
-                </Button>
+                <div className="flex gap-2">
+                  <Button className="gap-2" disabled={!isAdmin} onClick={() => setIsComboCreateOpen(true)} variant="secondary">
+                    <Package className="w-4 h-4" />
+                    Novo Combo
+                  </Button>
+                  <Button className="gap-2" disabled={!isAdmin} onClick={() => setIsProductCreateOpen(true)}>
+                    <Plus className="w-4 h-4" />
+                    Novo Produto
+                  </Button>
+                </div>
               </div>
 
               {productsLoading ? (
@@ -303,9 +404,72 @@ export default function Admin() {
                             }
                             disabled={!isAdmin}
                           />
-                          <Button variant="outline" size="sm" disabled={!isAdmin}>
-                            Editar
-                          </Button>
+	                          <Button
+	                            variant="outline"
+	                            size="sm"
+	                            disabled={!isAdmin}
+	                            onClick={() => setEditingProduct(product)}
+	                          >
+	                            <Pencil className="w-4 h-4" />
+	                          </Button>
+	                          <AlertDialog>
+	                            <AlertDialogTrigger asChild>
+	                              <Button
+	                                variant="destructive"
+	                                size="sm"
+	                                disabled={!isAdmin}
+	                              >
+	                                <Trash2 className="w-4 h-4" />
+	                              </Button>
+	                            </AlertDialogTrigger>
+	                            <AlertDialogContent>
+	                              <AlertDialogHeader>
+	                                <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+	                                <AlertDialogDescription>
+	                                  Esta ação não pode ser desfeita. Isso excluirá permanentemente o combo <span className="font-bold">{product.name}</span>.
+	                                </AlertDialogDescription>
+	                              </AlertDialogHeader>
+	                              <AlertDialogFooter>
+	                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+	                                <AlertDialogAction
+	                                  onClick={() => deleteProductMutation.mutate(product.id)}
+	                                  className="bg-destructive hover:bg-destructive/90"
+	                                  disabled={deleteProductMutation.isPending}
+	                                >
+	                                  {deleteProductMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Excluir"}
+	                                </AlertDialogAction>
+	                              </AlertDialogFooter>
+	                            </AlertDialogContent>
+	                          </AlertDialog>
+	                          <AlertDialog>
+	                            <AlertDialogTrigger asChild>
+	                              <Button
+	                                variant="destructive"
+	                                size="sm"
+	                                disabled={!isAdmin}
+	                              >
+	                                <Trash2 className="w-4 h-4" />
+	                              </Button>
+	                            </AlertDialogTrigger>
+	                            <AlertDialogContent>
+	                              <AlertDialogHeader>
+	                                <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+	                                <AlertDialogDescription>
+	                                  Esta ação não pode ser desfeita. Isso excluirá permanentemente o produto <span className="font-bold">{product.name}</span>.
+	                                </AlertDialogDescription>
+	                              </AlertDialogHeader>
+	                              <AlertDialogFooter>
+	                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+	                                <AlertDialogAction
+	                                  onClick={() => deleteProductMutation.mutate(product.id)}
+	                                  className="bg-destructive hover:bg-destructive/90"
+	                                  disabled={deleteProductMutation.isPending}
+	                                >
+	                                  {deleteProductMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Excluir"}
+	                                </AlertDialogAction>
+	                              </AlertDialogFooter>
+	                            </AlertDialogContent>
+	                          </AlertDialog>
                         </div>
                       </div>
                     </Card>
@@ -324,7 +488,7 @@ export default function Admin() {
             >
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-xl tracking-wide">Adicionais</h2>
-                <Button className="gap-2" disabled={!isAdmin}>
+                <Button className="gap-2" disabled={!isAdmin} onClick={() => setIsAdditionalCreateOpen(true)}>
                   <Plus className="w-4 h-4" />
                   Novo Adicional
                 </Button>
@@ -340,9 +504,43 @@ export default function Admin() {
                           +{formatPrice(additional.price)}
                         </span>
                       </div>
-                      <Button variant="outline" size="sm" disabled={!isAdmin}>
-                        Editar
-                      </Button>
+	                      <Button
+	                        variant="outline"
+	                        size="sm"
+	                        disabled={!isAdmin}
+	                        onClick={() => setEditingAdditional(additional)}
+	                      >
+	                        <Pencil className="w-4 h-4" />
+	                      </Button>
+	                      <AlertDialog>
+	                        <AlertDialogTrigger asChild>
+	                          <Button
+	                            variant="destructive"
+	                            size="sm"
+	                            disabled={!isAdmin}
+	                          >
+	                            <Trash2 className="w-4 h-4" />
+	                          </Button>
+	                        </AlertDialogTrigger>
+	                        <AlertDialogContent>
+	                          <AlertDialogHeader>
+	                            <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+	                            <AlertDialogDescription>
+	                              Esta ação não pode ser desfeita. Isso excluirá permanentemente o adicional <span className="font-bold">{additional.name}</span>.
+	                            </AlertDialogDescription>
+	                          </AlertDialogHeader>
+	                          <AlertDialogFooter>
+	                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+	                            <AlertDialogAction
+	                              onClick={() => deleteAdditionalMutation.mutate(additional.id)}
+	                              className="bg-destructive hover:bg-destructive/90"
+	                              disabled={deleteAdditionalMutation.isPending}
+	                            >
+	                              {deleteAdditionalMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Excluir"}
+	                            </AlertDialogAction>
+	                          </AlertDialogFooter>
+	                        </AlertDialogContent>
+	                      </AlertDialog>
                     </CardContent>
                   </Card>
                 ))}
@@ -359,7 +557,7 @@ export default function Admin() {
             >
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-xl tracking-wide">Cupons</h2>
-                <Button className="gap-2" disabled={!isAdmin}>
+                <Button className="gap-2" disabled={!isAdmin} onClick={() => setIsCouponCreateOpen(true)}>
                   <Plus className="w-4 h-4" />
                   Novo Cupom
                 </Button>
@@ -373,7 +571,13 @@ export default function Admin() {
                         <span className="font-mono font-bold text-primary text-lg">
                           {coupon.code}
                         </span>
-                        <Switch checked={coupon.active} disabled={!isAdmin} />
+                        <Switch
+                          checked={coupon.active}
+                          onCheckedChange={(checked) =>
+                            updateCouponMutation.mutate({ id: coupon.id, active: checked })
+                          }
+                          disabled={!isAdmin}
+                        />
                       </div>
                       <p className="text-muted-foreground text-sm">
                         {coupon.discount_type === "percentage"
@@ -387,30 +591,81 @@ export default function Admin() {
             </motion.div>
           </TabsContent>
 
-          {/* Promotions Tab */}
-          <TabsContent value="promotions">
+          {/* Combos Tab */}
+          <TabsContent value="combos">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="space-y-4"
             >
               <div className="flex items-center justify-between">
-                <h2 className="font-display text-xl tracking-wide">Promoções</h2>
-                <Button className="gap-2" disabled={!isAdmin}>
+                <h2 className="font-display text-xl tracking-wide">Combos</h2>
+                <Button className="gap-2" disabled={!isAdmin} onClick={() => setIsComboCreateOpen(true)}>
                   <Plus className="w-4 h-4" />
-                  Nova Promoção
+                  Novo Combo
                 </Button>
               </div>
 
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <Percent className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                  <p className="text-muted-foreground">Nenhuma promoção ativa</p>
-                  <p className="text-sm text-muted-foreground/70">
-                    Crie promoções para atrair mais clientes
-                  </p>
-                </CardContent>
-              </Card>
+              {productsLoading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : products.filter(p => p.category === "Combos").length === 0 ? (
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <Package className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                    <p className="text-muted-foreground">Nenhum combo criado</p>
+                    <p className="text-sm text-muted-foreground/70">
+                      Crie combos para oferecer ofertas especiais
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4">
+                  {products.filter(p => p.category === "Combos").map((product) => (
+                    <Card key={product.id} className="overflow-hidden">
+                      <div className="flex items-center gap-4 p-4">
+                        <img
+                          src={product.image_url || "/placeholder.svg"}
+                          alt={product.name}
+                          className="w-20 h-20 rounded-lg object-cover"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-foreground">{product.name}</h3>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {product.description}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-primary font-bold">
+                              {formatPrice(product.price)}
+                            </span>
+                            <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded">
+                              Combo
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={product.available}
+                            onCheckedChange={(checked) =>
+                              updateProductMutation.mutate({ id: product.id, available: checked })
+                            }
+                            disabled={!isAdmin}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={!isAdmin}
+                            onClick={() => setEditingProduct(product)}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </motion.div>
           </TabsContent>
 
@@ -424,6 +679,48 @@ export default function Admin() {
             />
           </TabsContent>
         </Tabs>
+
+        {/* Product Edit Modal */}
+        {editingProduct && (
+          <ProductEditForm
+            product={editingProduct}
+            onClose={() => setEditingProduct(null)}
+          />
+        )}
+
+        {/* Additional Edit Modal */}
+        {editingAdditional && (
+          <AdditionalEditForm
+            additional={editingAdditional}
+            onClose={() => setEditingAdditional(null)}
+          />
+        )}
+
+        {/* Product Create Modal */}
+        <ProductCreateForm
+          isOpen={isProductCreateOpen}
+          onClose={() => setIsProductCreateOpen(false)}
+        />
+
+        {/* Combo Create Modal */}
+        <ComboCreateForm
+          isOpen={isComboCreateOpen}
+          onClose={() => setIsComboCreateOpen(false)}
+        />
+
+        {/* Additional Create Modal */}
+        <AdditionalCreateForm
+          isOpen={isAdditionalCreateOpen}
+          onClose={() => setIsAdditionalCreateOpen(false)}
+        />
+
+        {/* Coupon Create Modal */}
+        <CouponCreateForm
+          isOpen={isCouponCreateOpen}
+          onClose={() => setIsCouponCreateOpen(false)}
+        />
+
+
       </main>
     </div>
   );

@@ -27,10 +27,13 @@ interface Coupon {
 
 export default function CheckoutModal({ open, onClose, storeSettings }: CheckoutModalProps) {
   const { items, total, clearCart } = useCart();
-  const [customerName, setCustomerName] = useState("");
-  const [address, setAddress] = useState("");
-  const [couponCode, setCouponCode] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+	  const [customerName, setCustomerName] = useState("");
+	  const [address, setAddress] = useState("");
+	  const [paymentMethod, setPaymentMethod] = useState("Dinheiro"); // Novo estado
+	  const [changeNeeded, setChangeNeeded] = useState(false); // Novo estado para troco
+	  const [changeAmount, setChangeAmount] = useState(""); // Novo estado para valor do troco
+	  const [couponCode, setCouponCode] = useState("");
+	  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
 
   // Fetch coupons from database
   const { data: coupons = [] } = useQuery({
@@ -84,8 +87,13 @@ export default function CheckoutModal({ open, onClose, storeSettings }: Checkout
 
   const generateWhatsAppMessage = () => {
     let message = `🍔 *NOVO PEDIDO - ${storeName}*\n\n`;
-    message += `👤 *Cliente:* ${customerName}\n`;
-    message += `📍 *Endereço:* ${address}\n\n`;
+	    message += `👤 *Cliente:* ${customerName}\n`;
+	    message += `📍 *Endereço:* ${address}\n`;
+	    message += `💳 *Pagamento:* ${paymentMethod}\n`;
+	    if (paymentMethod === "Dinheiro" && changeNeeded && changeAmount) {
+	      message += `💵 *Troco para:* ${formatPrice(Number(changeAmount))}\n`;
+	    }
+	    message += `\n`; // Adicionar quebra de linha após o pagamento
     message += `📋 *Itens do Pedido:*\n`;
 
     items.forEach((item, index) => {
@@ -117,10 +125,18 @@ export default function CheckoutModal({ open, onClose, storeSettings }: Checkout
       toast.error("Por favor, informe seu nome");
       return;
     }
-    if (!address.trim()) {
-      toast.error("Por favor, informe seu endereço");
-      return;
-    }
+	    if (!address.trim()) {
+	      toast.error("Por favor, informe seu endereço");
+	      return;
+	    }
+	    if (!paymentMethod) {
+	      toast.error("Por favor, selecione a forma de pagamento");
+	      return;
+	    }
+	    if (paymentMethod === "Dinheiro" && changeNeeded && (!changeAmount || Number(changeAmount) <= finalTotal)) {
+	      toast.error("Por favor, informe um valor válido para o troco (maior que o total)");
+	      return;
+	    }
 
     // Save order to database
     const orderItems = items.map((item) => ({
@@ -138,15 +154,16 @@ export default function CheckoutModal({ open, onClose, storeSettings }: Checkout
       customer_address: address,
       items: orderItems as unknown as import("@/integrations/supabase/types").Json,
       subtotal: total,
-      delivery_fee: deliveryFee,
-      discount: discount,
-      coupon_code: appliedCoupon?.code || null,
-      total: finalTotal,
-    });
+	      delivery_fee: deliveryFee,
+	      discount: discount,
+	      coupon_code: appliedCoupon?.code || null,
+	      total: finalTotal,
+	    });
 
     if (error) {
       console.error("Error saving order:", error);
-      toast.error("Erro ao salvar pedido");
+      console.error("Error details:", JSON.stringify(error, null, 2));
+      toast.error(`Erro ao salvar pedido: ${error.message || 'Erro desconhecido'}`);
       return;
     }
 
@@ -181,17 +198,58 @@ export default function CheckoutModal({ open, onClose, storeSettings }: Checkout
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="address">Endereço de Entrega</Label>
-              <Textarea
-                id="address"
-                placeholder="Rua, número, bairro, complemento..."
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                rows={3}
-              />
-            </div>
-          </div>
+	            <div className="space-y-2">
+	              <Label htmlFor="address">Endereço de Entrega</Label>
+	              <Textarea
+	                id="address"
+	                placeholder="Rua, número, bairro, complemento..."
+	                value={address}
+	                onChange={(e) => setAddress(e.target.value)}
+	                rows={3}
+	              />
+	            </div>
+	          </div>
+	
+	          {/* Payment Method */}
+	          <div className="space-y-2">
+	            <Label htmlFor="payment">Forma de Pagamento</Label>
+	            <select
+	              id="payment"
+	              value={paymentMethod}
+	              onChange={(e) => setPaymentMethod(e.target.value)}
+	              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+	            >
+	              <option value="Dinheiro">Dinheiro</option>
+	              <option value="Cartão de Crédito/Débito">Cartão de Crédito/Débito</option>
+	              <option value="Pix">Pix</option>
+	            </select>
+	          </div>
+	
+	          {/* Change Needed */}
+	          {paymentMethod === "Dinheiro" && (
+	            <div className="space-y-2">
+	              <div className="flex items-center space-x-2">
+	                <input
+	                  type="checkbox"
+	                  id="changeNeeded"
+	                  checked={changeNeeded}
+	                  onChange={(e) => setChangeNeeded(e.target.checked)}
+	                  className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+	                />
+	                <Label htmlFor="changeNeeded">Precisa de troco?</Label>
+	              </div>
+	
+	              {changeNeeded && (
+	                <Input
+	                  type="number"
+	                  placeholder="Troco para quanto? (Ex: 50)"
+	                  value={changeAmount}
+	                  onChange={(e) => setChangeAmount(e.target.value)}
+	                  min={finalTotal + 0.01}
+	                />
+	              )}
+	            </div>
+	          )}
 
           {/* Coupon */}
           <div className="space-y-2">

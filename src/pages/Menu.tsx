@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Share2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Product, Additional as AdditionalType } from "@/types";
+import { ComboItem, SimpleProduct } from "@/components/menu/CustomizationModal";
 import CategoryTabs from "@/components/menu/CategoryTabs";
 import ProductCard from "@/components/menu/ProductCard";
 import CartFooter from "@/components/menu/CartFooter";
@@ -29,7 +30,11 @@ export default function Menu() {
         .select("*")
         .eq("available", true)
         .order("category");
-      if (error) throw error;
+      if (error) {
+        console.error("Erro ao buscar produtos:", error);
+        toast.error("Erro ao carregar o cardápio. Tente novamente.");
+        throw error;
+      }
       return data.map((p) => ({
         id: p.id,
         name: p.name,
@@ -59,6 +64,22 @@ export default function Menu() {
     },
   });
 
+  // Fetch active promotions
+  const { data: promotions = [] } = useQuery({
+    queryKey: ["promotions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("promotions")
+        .select("*")
+        .eq("active", true);
+      if (error) {
+        console.error("Erro ao buscar promoções:", error);
+        throw error;
+      }
+      return data;
+    },
+  });
+
   // Fetch store settings
   const { data: storeSettings } = useQuery({
     queryKey: ["storeSettings"],
@@ -78,10 +99,70 @@ export default function Menu() {
     return ["Todos", ...cats];
   }, [products]);
 
-  const filteredProducts = useMemo(() => {
-    if (activeCategory === "Todos") return products;
-    return products.filter((p) => p.category === activeCategory);
-  }, [activeCategory, products]);
+	  // --- Lógica de Formatação de Combo ---
+	  const getComboItemIds = (description: string): string[] => {
+	    const comboItemsMarker = "--- COMBO ITEMS ---";
+	    const parts = description.split(comboItemsMarker);
+	    if (parts.length < 2) return [];
+	
+	    const comboItemsJson = parts[1].trim();
+	    try {
+	      const comboItems: ComboItem[] = JSON.parse(comboItemsJson);
+	      return comboItems.map(item => item.product_id);
+	    } catch (e) {
+	      return [];
+	    }
+	  };
+	
+	  const allComboItemIds = useMemo(() => {
+	    return products
+	      .filter(p => p.category === "Combos")
+	      .flatMap(p => getComboItemIds(p.description));
+	  }, [products]);
+	
+	  const { data: comboProductsNames = [] } = useQuery({
+	    queryKey: ["comboProductsNames", allComboItemIds],
+	    queryFn: async () => {
+	      if (allComboItemIds.length === 0) return [];
+	      const { data, error } = await supabase
+	        .from("products")
+	        .select("id, name")
+	        .in("id", allComboItemIds);
+	      if (error) throw error;
+	      return data as SimpleProduct[];
+	    },
+	    enabled: allComboItemIds.length > 0,
+	  });
+	
+	  const formatComboDescription = (product: Product): string => {
+	    if (product.category !== "Combos") return product.description;
+	
+	    const comboItemsMarker = "--- COMBO ITEMS ---";
+	    const parts = product.description.split(comboItemsMarker);
+	    if (parts.length < 2) return product.description;
+	
+	    const comboItemsJson = parts[1].trim();
+	    try {
+	      const comboItems: ComboItem[] = JSON.parse(comboItemsJson);
+	      if (!Array.isArray(comboItems)) return product.description;
+	
+	      const formattedItems = comboItems.map((item) => {
+	        const comboProduct = comboProductsNames.find(p => p.id === item.product_id);
+	        return `${item.quantity}x ${comboProduct ? comboProduct.name : 'Produto Desconhecido'}`;
+	      }).join(", ");
+	
+	      return `Contém: ${formattedItems}`;
+	
+	    } catch (e) {
+	      return product.description;
+	    }
+	  };
+	  // --- Fim Lógica de Formatação de Combo ---
+	
+	  const filteredProducts = useMemo(() => {
+	    if (activeCategory === "Todos") return products;
+	    return products.filter((p) => p.category === activeCategory);
+	  }, [activeCategory, products]);
 
   const handleShare = async () => {
     const shareData = {
@@ -146,8 +227,10 @@ export default function Menu() {
         </div>
       </header>
 
-      {/* Categories */}
-      <div className="sticky top-[73px] z-30 bg-background/80 backdrop-blur-lg border-b border-border">
+
+
+	      {/* Categories */}
+	      <div className="sticky top-[73px] z-30 bg-background/80 backdrop-blur-lg border-b border-border">
         <div className="max-w-4xl mx-auto px-4 py-3">
           <CategoryTabs
             categories={categories}
@@ -173,10 +256,13 @@ export default function Menu() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.05 }}
             >
-              <ProductCard
-                product={product}
-                onSelect={setSelectedProduct}
-              />
+	              <ProductCard
+	                product={{
+	                  ...product,
+	                  description: formatComboDescription(product),
+	                }}
+	                onSelect={setSelectedProduct}
+	              />
             </motion.div>
           ))}
         </motion.div>
