@@ -16,7 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Menu() {
-  const [activeCategory, setActiveCategory] = useState("Todos");
+  const [activeCategory, setActiveCategory] = useState("Porções");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -96,7 +96,9 @@ export default function Menu() {
 
   const categories = useMemo(() => {
     const cats = [...new Set(products.map((p) => p.category))];
-    return ["Todos", ...cats];
+    // Garantir que Porções seja a primeira categoria
+    const sortedCats = cats.filter(c => c !== "Porções");
+    return ["Porções", ...sortedCats];
   }, [products]);
 
 	  // --- Lógica de Formatação de Combo ---
@@ -159,10 +161,9 @@ export default function Menu() {
 	  };
 	  // --- Fim Lógica de Formatação de Combo ---
 	
-	  const filteredProducts = useMemo(() => {
-	    if (activeCategory === "Todos") return products;
-	    return products.filter((p) => p.category === activeCategory);
-	  }, [activeCategory, products]);
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => p.category === activeCategory);
+  }, [activeCategory, products]);
 
   const handleShare = async () => {
     const shareData = {

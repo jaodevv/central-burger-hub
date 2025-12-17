@@ -108,11 +108,22 @@ export default function CustomizationModal({
   };
 
   const handleAdditionalToggle = (additional: Additional) => {
-    setSelectedAdditionals((prev) =>
-      prev.find((a) => a.id === additional.id)
-        ? prev.filter((a) => a.id !== additional.id)
-        : [...prev, additional]
-    );
+    setSelectedAdditionals((prev) => {
+      const isSelected = prev.find((a) => a.id === additional.id);
+      
+      if (isSelected) {
+        // Se já está selecionado, remove
+        return prev.filter((a) => a.id !== additional.id);
+      } else {
+        // Se é uma porção e já tem 2 adicionais, não permite adicionar mais
+        const isPorcao = product?.category === "Porções";
+        if (isPorcao && prev.length >= 2) {
+          toast.error("Você pode adicionar no máximo 2 adicionais em porções");
+          return prev;
+        }
+        return [...prev, additional];
+      }
+    });
   };
 
   const unitPrice =

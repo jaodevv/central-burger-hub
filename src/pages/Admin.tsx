@@ -426,35 +426,6 @@ export default function Admin() {
 	                              <AlertDialogHeader>
 	                                <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
 	                                <AlertDialogDescription>
-	                                  Esta ação não pode ser desfeita. Isso excluirá permanentemente o combo <span className="font-bold">{product.name}</span>.
-	                                </AlertDialogDescription>
-	                              </AlertDialogHeader>
-	                              <AlertDialogFooter>
-	                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-	                                <AlertDialogAction
-	                                  onClick={() => deleteProductMutation.mutate(product.id)}
-	                                  className="bg-destructive hover:bg-destructive/90"
-	                                  disabled={deleteProductMutation.isPending}
-	                                >
-	                                  {deleteProductMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Excluir"}
-	                                </AlertDialogAction>
-	                              </AlertDialogFooter>
-	                            </AlertDialogContent>
-	                          </AlertDialog>
-	                          <AlertDialog>
-	                            <AlertDialogTrigger asChild>
-	                              <Button
-	                                variant="destructive"
-	                                size="sm"
-	                                disabled={!isAdmin}
-	                              >
-	                                <Trash2 className="w-4 h-4" />
-	                              </Button>
-	                            </AlertDialogTrigger>
-	                            <AlertDialogContent>
-	                              <AlertDialogHeader>
-	                                <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
-	                                <AlertDialogDescription>
 	                                  Esta ação não pode ser desfeita. Isso excluirá permanentemente o produto <span className="font-bold">{product.name}</span>.
 	                                </AlertDialogDescription>
 	                              </AlertDialogHeader>
