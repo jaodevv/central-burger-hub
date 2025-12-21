@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Trash2 } from "lucide-react";
 import {
@@ -245,7 +245,10 @@ export default function Admin() {
     },
   });
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (price: number | undefined | null) => {
+    if (price === undefined || price === null) {
+      return "R$ 0,00";
+    }
     return price.toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
@@ -270,7 +273,11 @@ export default function Admin() {
   }
 
   if (!user) {
-    return null;
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (

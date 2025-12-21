@@ -28,7 +28,7 @@ export default function Home() {
           >
             <h1 className="font-display text-6xl md:text-8xl tracking-wider mb-4">
               <span className="gradient-text">CENTRAL</span>{" "}
-              <span className="text-foreground">BURGER</span>
+              <span className="text-foreground">BURGUER</span>
             </h1>
             <p className="text-muted-foreground text-lg md:text-xl mb-12 max-w-xl mx-auto">
               Os melhores hambúrgueres artesanais da cidade, feitos com ingredientes
@@ -63,7 +63,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="py-6 text-center text-muted-foreground text-sm border-t border-border/50">
-        <p>© 2024 Central Burger. Todos os direitos reservados.</p>
+        <p>© 2024 Central Burguer. Todos os direitos reservados.</p>
       </footer>
     </div>
   );

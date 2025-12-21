@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
@@ -16,17 +16,20 @@ const passwordSchema = z.string().min(6, "Senha deve ter pelo menos 6 caracteres
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [redirecting, setRedirecting] = useState(false);
 
-  // Redirect if already logged in
-  if (user) {
-    navigate("/admin");
-    return null;
-  }
+  // Redirect if already logged in - usando useEffect para evitar tela preta
+  useEffect(() => {
+    if (user && !authLoading) {
+      setRedirecting(true);
+      navigate("/admin");
+    }
+  }, [user, authLoading, navigate]);
 
   const validateInputs = () => {
     const emailResult = emailSchema.safeParse(email);
@@ -50,9 +53,9 @@ export default function Auth() {
 
     setLoading(true);
     const { error } = await signIn(email, password);
-    setLoading(false);
 
     if (error) {
+      setLoading(false);
       if (error.message.includes("Invalid login credentials")) {
         toast.error("Email ou senha incorretos");
       } else {
@@ -62,7 +65,8 @@ export default function Auth() {
     }
 
     toast.success("Login realizado com sucesso!");
-    navigate("/admin");
+    setRedirecting(true);
+    // Navegação será feita pelo useEffect quando user mudar
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -83,8 +87,18 @@ export default function Auth() {
     }
 
     toast.success("Conta criada com sucesso! Você já pode fazer login.");
-    navigate("/admin");
+    setRedirecting(true);
+    // Navegação será feita pelo useEffect quando user mudar
   };
+
+  // Mostrar loading durante autenticação inicial ou redirecionamento
+  if (authLoading || redirecting || (user && !authLoading)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -105,7 +119,7 @@ export default function Auth() {
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="font-display text-3xl tracking-wide">
-              <span className="gradient-text">CENTRAL</span> BURGER
+              <span className="gradient-text">CENTRAL</span> BURGUER
             </CardTitle>
             <CardDescription>
               Acesse o painel administrativo

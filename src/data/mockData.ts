@@ -84,7 +84,7 @@ export const mockAdditionals: Additional[] = [
 ];
 
 export const mockStoreSettings: StoreSettings = {
-  name: "Central Burger",
+  name: "Central Burguer",
   whatsapp: "5511999999999",
   deliveryFee: 8.00,
   isOpen: true,

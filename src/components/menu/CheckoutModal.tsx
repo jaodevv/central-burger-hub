@@ -56,7 +56,7 @@ export default function CheckoutModal({ open, onClose, storeSettings }: Checkout
   };
 
   const deliveryFee = storeSettings?.deliveryFee ?? 8;
-  const storeName = storeSettings?.name ?? "Central Burger";
+  const storeName = storeSettings?.name ?? "Central Burguer";
   const storeWhatsapp = storeSettings?.whatsapp ?? "5511999999999";
 
   const discount = appliedCoupon

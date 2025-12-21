@@ -16,7 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Menu() {
-  const [activeCategory, setActiveCategory] = useState("Porções");
+  const [activeCategory, setActiveCategory] = useState("Lanches");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -94,12 +94,21 @@ export default function Menu() {
     },
   });
 
+  // Mapeamento de categorias do banco para exibição
+  const categoryMapping: Record<string, string> = {
+    "Burgers": "Lanches",
+    "Bebidas": "Bebidas",
+    "Porções": "Porções",
+    "Combos": "Combos",
+    "Acompanhamentos": "Porções", // Mapeia Acompanhamentos para Porções
+  };
+
+  // Ordem fixa das categorias: Lanches → Bebidas → Porções → Combos
+  const categoryOrder = ["Lanches", "Bebidas", "Porções", "Combos"];
+
   const categories = useMemo(() => {
-    const cats = [...new Set(products.map((p) => p.category))];
-    // Garantir que Porções seja a primeira categoria
-    const sortedCats = cats.filter(c => c !== "Porções");
-    return ["Porções", ...sortedCats];
-  }, [products]);
+    return categoryOrder;
+  }, []);
 
 	  // --- Lógica de Formatação de Combo ---
 	  const getComboItemIds = (description: string): string[] => {
@@ -162,13 +171,17 @@ export default function Menu() {
 	  // --- Fim Lógica de Formatação de Combo ---
 	
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => p.category === activeCategory);
+    // Filtra produtos baseado no mapeamento de categorias
+    return products.filter((p) => {
+      const mappedCategory = categoryMapping[p.category] || p.category;
+      return mappedCategory === activeCategory;
+    });
   }, [activeCategory, products]);
 
   const handleShare = async () => {
     const shareData = {
-      title: storeSettings?.name || "Central Burger",
-      text: `Confira o cardápio do ${storeSettings?.name || "Central Burger"}!`,
+      title: storeSettings?.name || "Central Burguer",
+      text: `Confira o cardápio do ${storeSettings?.name || "Central Burguer"}!`,
       url: window.location.href,
     };
 
@@ -210,7 +223,7 @@ export default function Menu() {
             </Link>
             <div className="text-center">
               <h1 className="font-display text-2xl tracking-wide">
-                <span className="gradient-text">{storeSettings?.name || "Central Burger"}</span>
+                <span className="gradient-text">{storeSettings?.name || "Central Burguer"}</span>
               </h1>
               <p className="text-xs text-muted-foreground">
                 {storeSettings?.is_open ? (

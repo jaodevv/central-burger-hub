@@ -154,8 +154,13 @@ export default function CustomizationModal({
 
   if (!product) return null;
 
+  // A categoria no banco continua sendo "Burgers", apenas exibimos como "Lanches"
   const isBurger = product.category === "Burgers";
   const isDrink = product.category === "Bebidas";
+  const isPorcao = product.category === "Porções" || product.category === "Acompanhamentos";
+
+  // Para porções, exibir apenas os 2 primeiros adicionais
+  const displayedAdditionals = isPorcao ? additionals.slice(0, 2) : additionals;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -199,11 +204,11 @@ export default function CustomizationModal({
           )}
 
           {/* Additionals - Not for drinks or combos */}
-          {!isDrink && !isCombo && additionals.length > 0 && (
+          {!isDrink && !isCombo && displayedAdditionals.length > 0 && (
             <div className="space-y-3">
-              <h4 className="font-medium text-foreground">Adicionais</h4>
+              <h4 className="font-medium text-foreground">Adicionais{isPorcao ? " (máx. 2)" : ""}</h4>
               <div className="space-y-2">
-                {additionals.map((additional) => (
+                {displayedAdditionals.map((additional) => (
                   <div
                     key={additional.id}
                     className="flex items-center justify-between p-3 rounded-lg bg-secondary/50"
