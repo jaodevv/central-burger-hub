@@ -10,6 +10,7 @@ import { MessageCircle, Tag, Check } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { StoreSettings } from "@/types";
+import { STORE_CONFIG, PAYMENT_OPTIONS } from "@/config/store";
 
 interface CheckoutModalProps {
   open: boolean;
@@ -55,9 +56,9 @@ export default function CheckoutModal({ open, onClose, storeSettings }: Checkout
     });
   };
 
-  const deliveryFee = storeSettings?.deliveryFee ?? 8;
-  const storeName = storeSettings?.name ?? "Central Burguer";
-  const storeWhatsapp = storeSettings?.whatsapp ?? "5511999999999";
+  const deliveryFee = storeSettings?.deliveryFee ?? STORE_CONFIG.defaultDeliveryFee;
+  const storeName = storeSettings?.name ?? STORE_CONFIG.name;
+  const storeWhatsapp = storeSettings?.whatsapp ?? STORE_CONFIG.whatsapp;
 
   const discount = appliedCoupon
     ? appliedCoupon.discount_type === "percentage"
@@ -161,8 +162,6 @@ export default function CheckoutModal({ open, onClose, storeSettings }: Checkout
 	    });
 
     if (error) {
-      console.error("Error saving order:", error);
-      console.error("Error details:", JSON.stringify(error, null, 2));
       toast.error(`Erro ao salvar pedido: ${error.message || 'Erro desconhecido'}`);
       return;
     }

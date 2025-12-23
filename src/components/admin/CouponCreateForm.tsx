@@ -77,7 +77,6 @@ export function CouponCreateForm({ isOpen, onClose }: CouponCreateFormProps) {
     },
     onError: (error) => {
       toast.error("Erro ao criar cupom. Verifique se o código já existe.");
-      console.error(error);
     },
   });
 

@@ -61,7 +61,6 @@ export function ComboCreateForm({ isOpen, onClose }: ComboCreateFormProps) {
         .from("products")
         .select("id, name, category");
       if (error) {
-        console.error("Erro ao buscar produtos para combo:", error);
         toast.error("Erro ao carregar lista de produtos para combo.");
         throw error;
       }
@@ -112,7 +111,6 @@ export function ComboCreateForm({ isOpen, onClose }: ComboCreateFormProps) {
     },
     onError: (error) => {
       toast.error(`Erro ao criar combo: ${error.message}`);
-      console.error("Erro detalhado ao criar combo:", error);
     },
   });
 

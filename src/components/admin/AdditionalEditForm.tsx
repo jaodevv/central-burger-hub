@@ -78,7 +78,6 @@ export function AdditionalEditForm({ additional, onClose }: AdditionalEditFormPr
     },
     onError: (error) => {
       toast.error("Erro ao atualizar adicional.");
-      console.error(error);
     },
   });
 

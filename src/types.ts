@@ -23,6 +23,7 @@ export interface CartItem {
 }
 
 export interface StoreSettings {
+  id?: string;
   name: string;
   whatsapp: string;
   deliveryFee: number;

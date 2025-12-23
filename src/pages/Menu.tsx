@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Share2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { CATEGORY_DISPLAY_MAP, CATEGORY_ORDER } from "@/config/store";
 
 export default function Menu() {
   const [activeCategory, setActiveCategory] = useState("Lanches");
@@ -31,7 +32,6 @@ export default function Menu() {
         .eq("available", true)
         .order("category");
       if (error) {
-        console.error("Erro ao buscar produtos:", error);
         toast.error("Erro ao carregar o cardápio. Tente novamente.");
         throw error;
       }
@@ -73,7 +73,6 @@ export default function Menu() {
         .select("*")
         .eq("active", true);
       if (error) {
-        console.error("Erro ao buscar promoções:", error);
         throw error;
       }
       return data;
@@ -94,20 +93,16 @@ export default function Menu() {
     },
   });
 
-  // Mapeamento de categorias do banco para exibição
+  // Mapeamento de categorias do banco para exibição (usando config centralizada)
   const categoryMapping: Record<string, string> = {
-    "Burgers": "Lanches",
+    ...CATEGORY_DISPLAY_MAP,
     "Bebidas": "Bebidas",
     "Porções": "Porções",
     "Combos": "Combos",
-    "Acompanhamentos": "Porções", // Mapeia Acompanhamentos para Porções
   };
 
-  // Ordem fixa das categorias: Lanches → Bebidas → Porções → Combos
-  const categoryOrder = ["Lanches", "Bebidas", "Porções", "Combos"];
-
   const categories = useMemo(() => {
-    return categoryOrder;
+    return CATEGORY_ORDER;
   }, []);
 
 	  // --- Lógica de Formatação de Combo ---
@@ -120,7 +115,7 @@ export default function Menu() {
 	    try {
 	      const comboItems: ComboItem[] = JSON.parse(comboItemsJson);
 	      return comboItems.map(item => item.product_id);
-	    } catch (e) {
+	    } catch {
 	      return [];
 	    }
 	  };
@@ -164,7 +159,7 @@ export default function Menu() {
 	
 	      return `Contém: ${formattedItems}`;
 	
-	    } catch (e) {
+	    } catch {
 	      return product.description;
 	    }
 	  };
@@ -193,7 +188,6 @@ export default function Menu() {
         toast.success("Link copiado para a área de transferência!");
       }
     } catch (error) {
-      console.error("Error sharing:", error);
     }
   };
 

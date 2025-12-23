@@ -91,7 +91,6 @@ export function ProductEditForm({ product, onClose }: ProductEditFormProps) {
     },
     onError: (error) => {
       toast.error("Erro ao atualizar produto.");
-      console.error(error);
     },
   });
 

@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Minus, Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { MEAT_POINT_OPTIONS, ADDITIONALS_LIMIT } from "@/config/store";
 
 interface CustomizationModalProps {
   product: Product | null;
@@ -31,7 +32,7 @@ export interface SimpleProduct {
   name: string;
 }
 
-const meatPoints = ["Mal passado", "Ao ponto", "Bem passado"];
+const meatPoints = MEAT_POINT_OPTIONS.map(opt => opt.value);
 
 export default function CustomizationModal({
   product,
@@ -57,7 +58,7 @@ export default function CustomizationModal({
     try {
       const comboItems: ComboItem[] = JSON.parse(comboItemsJson);
       return comboItems.map(item => item.product_id);
-    } catch (e) {
+    } catch {
       return [];
     }
   };
@@ -94,7 +95,7 @@ export default function CustomizationModal({
 
       return `Contém: ${formattedItems}`;
 
-    } catch (e) {
+    } catch {
       return description;
     }
   };

@@ -70,7 +70,6 @@ export function AdditionalCreateForm({ isOpen, onClose }: AdditionalCreateFormPr
     },
     onError: (error) => {
       toast.error("Erro ao criar adicional.");
-      console.error(error);
     },
   });
 

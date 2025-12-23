@@ -80,7 +80,6 @@ export function ProductCreateForm({ isOpen, onClose }: ProductCreateFormProps) {
     },
     onError: (error) => {
       toast.error("Erro ao criar produto.");
-      console.error(error);
     },
   });
 

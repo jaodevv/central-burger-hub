@@ -165,7 +165,6 @@ export default function Admin() {
 	    },
 	    onError: (error) => {
 	      toast.error("Erro ao excluir produto. Você precisa ser admin.");
-	      console.error(error);
 	    },
 	  });
 	
@@ -181,7 +180,6 @@ export default function Admin() {
 	    },
 	    onError: (error) => {
 	      toast.error("Erro ao excluir adicional. Você precisa ser admin.");
-	      console.error(error);
 	    },
 	  });
 	
@@ -200,7 +198,6 @@ export default function Admin() {
     },
     onError: (error) => {
       toast.error("Erro ao atualizar produto. Você precisa ser admin.");
-      console.error(error);
     },
   });
 
@@ -219,7 +216,6 @@ export default function Admin() {
     },
     onError: (error) => {
       toast.error("Erro ao atualizar cupom. Você precisa ser admin.");
-      console.error(error);
     },
   });
 
@@ -241,7 +237,6 @@ export default function Admin() {
     },
     onError: (error) => {
       toast.error("Erro ao atualizar. Você precisa ser admin.");
-      console.error(error);
     },
   });
 
