@@ -29,10 +29,10 @@ import { toast } from "sonner";
 const formSchema = z.object({
   name: z.string().min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
   description: z.string().optional(),
-  price: z.coerce.number().min(0.01, { message: "O preço deve ser maior que zero." }),
+  price: z.number().min(0.01, { message: "O preço deve ser maior que zero." }),
   category: z.string().min(1, { message: "A categoria é obrigatória." }),
   image_url: z.string().url({ message: "URL de imagem inválida." }).optional().or(z.literal("")),
-  available: z.boolean().default(true),
+  available: z.boolean(),
 });
 
 type ProductFormValues = z.infer<typeof formSchema>;
