@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { checkoutSchema, CheckoutFormValues } from "@/schemas/checkout";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useCart } from "@/context/CartContext";
 import { toast } from "sonner";
 import { MessageCircle, Tag, Check } from "lucide-react";
@@ -28,11 +32,21 @@ interface Coupon {
 
 export default function CheckoutModal({ open, onClose, storeSettings }: CheckoutModalProps) {
   const { items, total, clearCart } = useCart();
-	  const [customerName, setCustomerName] = useState("");
-	  const [address, setAddress] = useState("");
-	  const [paymentMethod, setPaymentMethod] = useState("Dinheiro"); // Novo estado
-	  const [changeNeeded, setChangeNeeded] = useState(false); // Novo estado para troco
-	  const [changeAmount, setChangeAmount] = useState(""); // Novo estado para valor do troco
+  const [changeNeeded, setChangeNeeded] = useState(false); // Novo estado para troco
+
+  const form = useForm<CheckoutFormValues>({
+    resolver: zodResolver(checkoutSchema),
+    defaultValues: {
+      name: "",
+      address: "",
+      notes: "",
+      paymentMethod: "Dinheiro",
+      change: 0,
+    },
+  });
+
+  const { isSubmitting, isValid } = form.formState;
+  const paymentMethod = form.watch("paymentMethod");
 	  const [couponCode, setCouponCode] = useState("");
 	  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
 
@@ -86,14 +100,14 @@ export default function CheckoutModal({ open, onClose, storeSettings }: Checkout
     setCouponCode("");
   };
 
-  const generateWhatsAppMessage = () => {
+  const generateWhatsAppMessage = (data: CheckoutFormValues) => {
     let message = `🍔 *NOVO PEDIDO - ${storeName}*\n\n`;
-	    message += `👤 *Cliente:* ${customerName}\n`;
-	    message += `📍 *Endereço:* ${address}\n`;
-	    message += `💳 *Pagamento:* ${paymentMethod}\n`;
-	    if (paymentMethod === "Dinheiro" && changeNeeded && changeAmount) {
-	      message += `💵 *Troco para:* ${formatPrice(Number(changeAmount))}\n`;
-	    }
+message += `👤 *Cliente:* ${data.name}\n`;
+		    message += `📍 *Endereço:* ${data.address}\n`;
+		    message += `💳 *Pagamento:* ${data.paymentMethod}\n`;
+		    if (data.paymentMethod === "Dinheiro" && changeNeeded && data.change) {
+		      message += `💵 *Troco para:* ${formatPrice(data.change)}\n`;
+		    }
 	    message += `\n`; // Adicionar quebra de linha após o pagamento
     message += `📋 *Itens do Pedido:*\n`;
 
@@ -121,23 +135,16 @@ export default function CheckoutModal({ open, onClose, storeSettings }: Checkout
     return encodeURIComponent(message);
   };
 
-  const handleSubmit = async () => {
-    if (!customerName.trim()) {
-      toast.error("Por favor, informe seu nome");
+const handleSubmit = async (values: CheckoutFormValues) => {
+    if (items.length === 0) {
+      toast.error("Seu carrinho está vazio. Adicione itens antes de finalizar.");
       return;
     }
-	    if (!address.trim()) {
-	      toast.error("Por favor, informe seu endereço");
-	      return;
-	    }
-	    if (!paymentMethod) {
-	      toast.error("Por favor, selecione a forma de pagamento");
-	      return;
-	    }
-	    if (paymentMethod === "Dinheiro" && changeNeeded && (!changeAmount || Number(changeAmount) <= finalTotal)) {
-	      toast.error("Por favor, informe um valor válido para o troco (maior que o total)");
-	      return;
-	    }
+
+    if (paymentMethod === "Dinheiro" && changeNeeded && (!values.change || values.change <= finalTotal)) {
+      form.setError("change", { type: "manual", message: "O valor do troco deve ser maior que o total do pedido." });
+      return;
+    }
 
     // Save order to database
     const orderItems = items.map((item) => ({
@@ -151,8 +158,8 @@ export default function CheckoutModal({ open, onClose, storeSettings }: Checkout
     }));
 
     const { error } = await supabase.from("orders").insert({
-      customer_name: customerName,
-      customer_address: address,
+      customer_name: values.name,
+      customer_address: values.address,
       items: orderItems as unknown as import("@/integrations/supabase/types").Json,
       subtotal: total,
 	      delivery_fee: deliveryFee,
@@ -166,7 +173,7 @@ export default function CheckoutModal({ open, onClose, storeSettings }: Checkout
       return;
     }
 
-    const message = generateWhatsAppMessage();
+    const message = generateWhatsAppMessage(values);
     const whatsappUrl = `https://wa.me/${storeWhatsapp}?text=${message}`;
 
     window.open(whatsappUrl, "_blank");
@@ -176,7 +183,7 @@ export default function CheckoutModal({ open, onClose, storeSettings }: Checkout
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={() => { onClose(); form.reset(); }}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl tracking-wide">
@@ -184,45 +191,59 @@ export default function CheckoutModal({ open, onClose, storeSettings }: Checkout
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Customer Info */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Seu Nome</Label>
-              <Input
-                id="name"
-                placeholder="Digite seu nome"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+{/* Customer Info */}
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Seu Nome</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Digite seu nome" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-	            <div className="space-y-2">
-	              <Label htmlFor="address">Endereço de Entrega</Label>
-	              <Textarea
-	                id="address"
-	                placeholder="Rua, número, bairro, complemento..."
-	                value={address}
-	                onChange={(e) => setAddress(e.target.value)}
-	                rows={3}
-	              />
-	            </div>
-	          </div>
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Endereço de Entrega</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Rua, número, bairro, complemento..."
+                        rows={3}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 	
-	          {/* Payment Method */}
-	          <div className="space-y-2">
-	            <Label htmlFor="payment">Forma de Pagamento</Label>
-	            <select
-	              id="payment"
-	              value={paymentMethod}
-	              onChange={(e) => setPaymentMethod(e.target.value)}
-	              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-	            >
-	              <option value="Dinheiro">Dinheiro</option>
-	              <option value="Cartão de Crédito/Débito">Cartão de Crédito/Débito</option>
-	              <option value="Pix">Pix</option>
-	            </select>
-	          </div>
+{/* Payment Method */}
+              <FormField
+                control={form.control}
+                name="paymentMethod"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Forma de Pagamento</FormLabel>
+                    <FormControl>
+                      <select {...field} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                        {PAYMENT_OPTIONS.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 	
 	          {/* Change Needed */}
 	          {paymentMethod === "Dinheiro" && (
@@ -238,15 +259,26 @@ export default function CheckoutModal({ open, onClose, storeSettings }: Checkout
 	                <Label htmlFor="changeNeeded">Precisa de troco?</Label>
 	              </div>
 	
-	              {changeNeeded && (
-	                <Input
-	                  type="number"
-	                  placeholder="Troco para quanto? (Ex: 50)"
-	                  value={changeAmount}
-	                  onChange={(e) => setChangeAmount(e.target.value)}
-	                  min={finalTotal + 0.01}
-	                />
-	              )}
+{changeNeeded && (
+                <FormField
+                  control={form.control}
+                  name="change"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Troco para quanto? (Ex: 50)"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          min={finalTotal + 0.01}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 	            </div>
 	          )}
 
@@ -305,12 +337,13 @@ export default function CheckoutModal({ open, onClose, storeSettings }: Checkout
           </div>
 
           {/* Submit Button */}
-          <Button onClick={handleSubmit} className="w-full gap-2" size="lg">
+          <Button type="submit" disabled={!isValid || isSubmitting || items.length === 0} className="w-full gap-2" size="lg">
             <MessageCircle className="w-5 h-5" />
             Enviar Pedido via WhatsApp
-          </Button>
-        </div>
-      </DialogContent>
+                    </form>
+        </Form>
+	        </div>
+	      </DialogContent>>
     </Dialog>
   );
 }
