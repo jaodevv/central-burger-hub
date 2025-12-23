@@ -35,7 +35,7 @@ interface Additional {
 // Esquema de validação com Zod
 const formSchema = z.object({
   name: z.string().min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
-  price: z.coerce.number().min(0.01, { message: "O preço deve ser maior que zero." }),
+  price: z.number().min(0.01, { message: "O preço deve ser maior que zero." }),
   available: z.boolean(),
 });
 

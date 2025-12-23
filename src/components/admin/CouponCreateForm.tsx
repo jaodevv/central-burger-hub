@@ -28,9 +28,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 // Esquema de validação com Zod
 const formSchema = z.object({
   code: z.string().min(3, { message: "O código deve ter pelo menos 3 caracteres." }).toUpperCase(),
-  discount: z.coerce.number().min(0.01, { message: "O desconto deve ser maior que zero." }),
+  discount: z.number().min(0.01, { message: "O desconto deve ser maior que zero." }),
   discount_type: z.enum(["percentage", "fixed"], { message: "Tipo de desconto inválido." }),
-  active: z.boolean().default(true),
+  active: z.boolean(),
   expires_at: z.string().optional(), // Simplificado para string, pode ser melhorado com DatePicker
 });
 

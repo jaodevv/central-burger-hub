@@ -30,16 +30,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 // Esquema de validação para os itens do combo
 const comboItemSchema = z.object({
   product_id: z.string().min(1, { message: "Selecione um produto." }),
-  quantity: z.coerce.number().min(1, { message: "Mínimo 1." }),
+  quantity: z.number().min(1, { message: "Mínimo 1." }),
 });
 
 // Esquema de validação com Zod para o Combo
 const formSchema = z.object({
   name: z.string().min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
   description: z.string().optional(),
-  price: z.coerce.number().min(0.01, { message: "O preço deve ser maior que zero." }),
+  price: z.number().min(0.01, { message: "O preço deve ser maior que zero." }),
   image_url: z.string().url({ message: "URL de imagem inválida." }).optional().or(z.literal("")),
-  available: z.boolean().default(true),
+  available: z.boolean(),
   combo_items: z.array(comboItemSchema).min(1, { message: "Um combo deve ter pelo menos um item." }),
 });
 

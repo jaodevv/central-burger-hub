@@ -20,13 +20,13 @@ interface CustomizationModalProps {
 }
 
 // Interface para os itens do combo (salvos na descrição)
-interface ComboItem {
+export interface ComboItem {
   product_id: string;
   quantity: number;
 }
 
 // Interface para o produto com apenas o ID e o nome
-interface SimpleProduct {
+export interface SimpleProduct {
   id: string;
   name: string;
 }
