@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
+import { Product, Additional, Coupon, StoreSettings, Promotion } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { SettingsForm } from "@/components/admin/SettingsForm";
@@ -33,51 +34,7 @@ import { AdditionalEditForm } from "@/components/admin/AdditionalEditForm";
 import { ProductEditForm } from "@/components/admin/ProductEditForm";
 import { ComboCreateForm } from "@/components/admin/ComboCreateForm";
 
-interface Product {
-  id: string;
-  name: string;
-  description: string | null;
-  price: number;
-  category: string;
-  image_url: string | null;
-  available: boolean;
-}
 
-interface Additional {
-  id: string;
-  name: string;
-  price: number;
-  available: boolean;
-}
-
-interface Coupon {
-  id: string;
-  code: string;
-  discount: number;
-  discount_type: string;
-  active: boolean;
-}
-
-interface Promotion {
-  id: string;
-  name: string;
-  description: string | null;
-  discount: number;
-  discount_type: 'percentage' | 'fixed';
-  applicable_categories: string[] | null;
-  active: boolean;
-  starts_at: string | null;
-  ends_at: string | null;
-}
-
-interface StoreSettings {
-  id: string;
-  name: string;
-  whatsapp: string;
-  delivery_fee: number;
-  is_open: boolean;
-  opening_hours: string;
-}
 
 export default function Admin() {
   const navigate = useNavigate();
