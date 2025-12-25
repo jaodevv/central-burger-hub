@@ -128,3 +128,34 @@
     animation: pulse 3s ease-in-out infinite;
   }
 }
+
+/* --- SUPORTE DASHMENU TICKET TÉRMICO --- */
+@media print {
+  /* Esconde absolutamente tudo (Header, Footer, Painel Admin) */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Revela apenas o container do ticket e seus filhos */
+  #printable-ticket, #printable-ticket * {
+    visibility: visible !important;
+  }
+
+  /* Reseta o posicionamento para o papel térmico */
+  #printable-ticket {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 80mm !important;
+    margin: 0 !important;
+    padding: 4mm !important;
+    background-color: white !important;
+    color: black !important;
+  }
+
+  /* Remove margens e informações do navegador (URL, Data) */
+  @page {
+    margin: 0 !important;
+    size: auto;
+  }
+}
