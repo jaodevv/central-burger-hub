@@ -3,22 +3,35 @@ import react from '@vitejs/plugin-react'
 import path from "path"
 
 export default defineConfig({
-  // Força o uso do plugin React baseado em Babel (seguro para Termux e Web)
+  // Define o caminho base como relativo para funcionar perfeitamente em túneis (Serveo)
+  base: './',
+  // Plugin React baseado em Babel para máxima compatibilidade no Termux
   plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    host: true,
+    // Permite que o túnel do Serveo ou outros hosts acessem o servidor de dev
+    allowedHosts: [
+      '.serveousercontent.com',
+      '.serveo.net',
+      'localhost',
+      '127.0.0.1'
+    ],
+  },
   build: {
-    // Garante que o build não tente buscar otimizações nativas incompatíveis
-    minify: 'terser', 
+    // Usa Terser para evitar erros de compilação nativa no ambiente Android
+    minify: 'terser',
     terserOptions: {
       compress: {
         drop_console: true,
       },
     },
     commonjsOptions: {
+      // Corrigido: Garante compatibilidade entre módulos ESM e CommonJS
       transformMixedEsModules: true,
     },
   },
