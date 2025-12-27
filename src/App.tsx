@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/context/CartContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Home from "@/pages/Home";
 import Menu from "@/pages/Menu";
@@ -56,6 +57,7 @@ const App = () => (
               <AuthenticatedRoutes />
             </ErrorBoundary>
           </BrowserRouter>
+          <SpeedInsights />
         </CartProvider>
       </AuthProvider>
     </TooltipProvider>
